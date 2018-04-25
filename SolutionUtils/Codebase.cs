@@ -20,22 +20,21 @@
         private readonly ILogger _logger;
         private string _folder;
         private ProjectCollection _projectCollection;
-        private string _projectReferenceItemType = "ProjectReference";
 
         private Codebase(string folder, IEnumerable<string> solutions, ILogger logger)
         {
             _folder = folder;
             _logger = logger;
-            Solutions = solutions.Select(f => SolutionFile.Parse(f)).ToList();
+            Solutions = solutions.Select(f => new Solution(f, this, logger)).ToList();
 
             _projectCollection = new ProjectCollection(ToolsetDefinitionLocations.Registry);
         }
 
-        public Dictionary<string, Project> ProjectsByFileName { get; } = new Dictionary<string, Project>();
-        public Dictionary<Guid, Project> ProjectsByGuid { get; } = new Dictionary<Guid, Project>();
-        public Dictionary<Guid, Project> ProjectsWithDuplicateGuid { get; } = new Dictionary<Guid, Project>();
+        public Dictionary<string, CodebaseProject> ProjectsByFileName { get; } = new Dictionary<string, CodebaseProject>();
+        public Dictionary<Guid, CodebaseProject> ProjectsByGuid { get; } = new Dictionary<Guid, CodebaseProject>();
+        public Dictionary<Guid, CodebaseProject> ProjectsWithDuplicateGuid { get; } = new Dictionary<Guid, CodebaseProject>();
 
-        public List<SolutionFile> Solutions { get; set; }
+        public List<Solution> Solutions { get; set; }
 
         public static Codebase CreateFromFolder(string folder, ILogger logger)
         {
@@ -80,95 +79,24 @@
 
             foreach (var solution in Solutions)
             {
-                FixProjectReferences(solution);
+                solution.FixProjectReferences();
             }
         }
 
-        public IEnumerable<Project> GetAllProjects()
+        public IEnumerable<CodebaseProject> GetAllProjects()
         {
-            var projects = new List<Project>();
-
-            foreach (var projectInSolution in Solutions.SelectMany(s => s.GetMsBuildProjects()))
-            {
-                var project = LoadProject(projectInSolution);
-
-                if (project == null)
-                {
-                    continue;
-                }
-
-                projects.Add(project);
-
-                projects.AddRange(GetReferencedProjects(project, true));
-            }
-
-            return projects.Distinct();
-        }
-
-        private void FixProjectReferences(SolutionFile solution)
-        {
-            var missingProjects = solution.GetMsBuildProjects().Where(p => !File.Exists(p.AbsolutePath)).ToList();
-
-            var removedProjects = missingProjects.Where(p => !ProjectsByGuid.ContainsKey(Guid.Parse(p.ProjectGuid))).ToList();
-            var movedProjects = missingProjects.Except(removedProjects).ToList();
-            var changedProjectGuids = new List<Tuple<string, string>>();
-
-            foreach (var projectInSolution in removedProjects.ToList())
-            {
-                var fileName = Path.GetFileName(projectInSolution.AbsolutePath);
-
-                var projects = ProjectsByFileName
-                    .Where(p => Path.GetFileName(p.Key)?.Equals(fileName, StringComparison.OrdinalIgnoreCase) == true)
-                    .Select(p => p.Value)
-                    .ToList();
-
-                if (projects.Count == 1)
-                {
-                    var newGuid = projects[0].GetProjectGuid().ToString("B").ToUpperInvariant();
-                    changedProjectGuids.Add(Tuple.Create(projectInSolution.ProjectGuid, newGuid));
-
-                    removedProjects.Remove(projectInSolution);
-                    movedProjects.Add(projectInSolution);
-                    projectInSolution.UpdateProjectGuid(newGuid);
-                }
-
-                // TODO: log warning
-            }
-
-            // TODO: try to find missing projects by file name
-
-            if (removedProjects.Any() || movedProjects.Any())
-            {
-                solution.Update(removedProjects, movedProjects, null, changedProjectGuids, this);
-            }
-        }
-
-        private IEnumerable<Project> GetReferencedProjects(Project project, bool recursive)
-        {
-            var projects = project.GetItemsIgnoringCondition(_projectReferenceItemType)
-                .Select(i => Path.GetFullPath(Path.Combine(project.DirectoryPath, i.EvaluatedInclude)))
-                .Select(LoadProject)
-                .Where(p => p != null)
-                .Distinct()
-                .ToList();
-
-            if (recursive)
-            {
-                return projects.Concat(projects.SelectMany(p => GetReferencedProjects(p, true))).Distinct();
-            }
-
-            return projects;
+            return Solutions.SelectMany(s => s.GetAllProjects()).Distinct();
         }
 
         [CanBeNull]
-        private Project LoadProject(ProjectInSolution projectInSolution) => LoadProject(projectInSolution.AbsolutePath);
+        internal CodebaseProject LoadProject(ProjectInSolution projectInSolution) => LoadProject(projectInSolution.AbsolutePath);
 
         [CanBeNull]
-        private Project LoadProject(string absolutePath)
+        internal CodebaseProject LoadProject(string absolutePath)
         {
             absolutePath = Path.GetFullPath(absolutePath).ToLowerInvariant();
 
-            Project project;
+            CodebaseProject project;
 
             if (ProjectsByFileName.TryGetValue(absolutePath, out project))
             {
@@ -182,7 +110,7 @@
 
             try
             {
-                project = new Project(
+                var msbuildProject = new Project(
                     absolutePath,
                     _projectCollection.GlobalProperties,
                     _projectCollection.DefaultToolsVersion,
@@ -190,6 +118,8 @@
                     ProjectLoadSettings.IgnoreEmptyImports
                     | ProjectLoadSettings.IgnoreInvalidImports
                     | ProjectLoadSettings.IgnoreMissingImports);
+
+                project = new CodebaseProject(this, msbuildProject, _logger);
             }
             catch (Exception exception)
             {
@@ -199,15 +129,13 @@
 
             ProjectsByFileName.Add(absolutePath, project);
 
-            var guid = project.GetProjectGuid();
-
-            if (ProjectsByGuid.ContainsKey(guid))
+            if (ProjectsByGuid.ContainsKey(project.Guid))
             {
-                ProjectsWithDuplicateGuid.Add(guid, project);
+                ProjectsWithDuplicateGuid.Add(project.Guid, project);
             }
             else
             {
-                ProjectsByGuid.Add(guid, project);
+                ProjectsByGuid.Add(project.Guid, project);
             }
 
             return project;

@@ -13,7 +13,6 @@
     using JetBrains.Annotations;
 
     using Microsoft.Build.Construction;
-    using Microsoft.Build.Evaluation;
 
     #endregion
 
@@ -27,14 +26,14 @@
             solution.ProjectsInOrder.Where(p => p.ProjectType != SolutionProjectType.SolutionFolder);
 
         public static void Update(
-            this SolutionFile solution,
+            this Solution solution,
             List<ProjectInSolution> removedProjects,
             List<ProjectInSolution> updatedProjects,
-            List<Project> newProjects,
+            List<CodebaseProject> newProjects,
             List<Tuple<string, string>> changedProjectGuids,
             Codebase codebase)
         {
-            var path = solution.GetFullPath();
+            var path = solution.FullPath;
 
             var newLines = solution.Update(
                     File.ReadAllLines(path),
@@ -128,11 +127,11 @@
         }
 
         private static IEnumerable<string> Update(
-            this SolutionFile solution,
+            this Solution solution,
             string[] solutionFileLines,
             List<ProjectInSolution> removedProjects,
             List<ProjectInSolution> updatedProjects,
-            List<Project> newProjects,
+            List<CodebaseProject> newProjects,
             List<Tuple<string, string>> changedProjectGuids,
             Codebase codebase)
         {
@@ -162,18 +161,18 @@
                     var projectRelativeUri = project.GetRelativePath(solution);
 
                     line = line.Replace(projectInSolution.RelativePath, projectRelativeUri.ToFileSystemPath())
-                        .Replace(projectInSolution.ProjectName, project.GetName());
+                        .Replace(projectInSolution.ProjectName, project.Name);
                 }
 
                 if (newProjects != null && IsGlobalSectionLine(line))
                 {
                     foreach (var newProject in newProjects)
                     {
-                        var guid = newProject.GetProjectGuid().ToString("B").ToUpperInvariant();
+                        var guid = newProject.Guid.ToString("B").ToUpperInvariant();
                         var relativePath = newProject.GetRelativePath(solution).ToFileSystemPath();
-                        var typeGuid = newProject.GetSolutionProjectTypeGuid().ToUpperInvariant();
+                        var typeGuid = newProject.SolutionProjectTypeGuid;
 
-                        yield return $"Project(\"{{{typeGuid}}}\") = \"{newProject.GetName()}\", \"{relativePath}\", \"{{{guid}}}\"";
+                        yield return $"Project(\"{{{typeGuid}}}\") = \"{newProject.Name}\", \"{relativePath}\", \"{{{guid}}}\"";
                         yield return "EndProject";
                     }
                 }
