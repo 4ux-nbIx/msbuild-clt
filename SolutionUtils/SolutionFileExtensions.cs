@@ -13,6 +13,7 @@
     using JetBrains.Annotations;
 
     using Microsoft.Build.Construction;
+    using Microsoft.Build.Evaluation;
 
     #endregion
 
@@ -22,52 +23,37 @@
         public static string GetFullPath(this SolutionFile solution) =>
             solution.GetType().GetProperty("FullPath", BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(solution) as string;
 
+        public static IEnumerable<ProjectInSolution> GetMsBuildProjects(this SolutionFile solution) =>
+            solution.ProjectsInOrder.Where(p => p.ProjectType != SolutionProjectType.SolutionFolder);
+
         public static void Update(
             this SolutionFile solution,
             List<ProjectInSolution> removedProjects,
-            List<ProjectInSolution> movedProjects,
+            List<ProjectInSolution> updatedProjects,
+            List<Project> newProjects,
+            List<Tuple<string, string>> changedProjectGuids,
             Codebase codebase)
         {
             var path = solution.GetFullPath();
 
-            var newLines = solution.Update(File.ReadAllLines(path), removedProjects, movedProjects, codebase).ToList();
+            var newLines = solution.Update(
+                    File.ReadAllLines(path),
+                    removedProjects,
+                    updatedProjects,
+                    newProjects,
+                    changedProjectGuids,
+                    codebase)
+                .ToList();
 
             File.WriteAllLines(path, newLines);
         }
 
-        private static string GetFileSystemName(string projectFullPath, out string directoryName)
+        public static void UpdateProjectGuid(this ProjectInSolution projectInSolution, string guid)
         {
-            directoryName = Path.GetDirectoryName(projectFullPath);
-
-            if (directoryName == null)
-            {
-                directoryName = projectFullPath;
-                return null;
-            }
-
-            var name = Path.GetFileName(projectFullPath);
-            Debug.Assert(name != null, nameof(name) + " != null");
-
-            var entry = Directory.GetFileSystemEntries(directoryName, name).First();
-            return Path.GetFileName(entry);
+            projectInSolution.GetType().GetProperty(nameof(ProjectInSolution.ProjectGuid))?.SetValue(projectInSolution, guid);
         }
 
-        private static string GetFileSystemPath(string projectFullPath)
-        {
-            var result = GetFileSystemName(projectFullPath, out var parent);
-
-            while (true)
-            {
-                var name = GetFileSystemName(parent, out parent);
-
-                if (name == null)
-                {
-                    return parent + result;
-                }
-
-                result = name + Path.DirectorySeparatorChar + result;
-            }
-        }
+        private static bool IsGlobalSectionLine(string line) => line.TrimStart().Equals("Global", StringComparison.Ordinal);
 
         private static bool IsGlobalSectionProjectLine(string line, List<string> projectGuids)
         {
@@ -118,6 +104,16 @@
             return false;
         }
 
+        private static string ReplaceProjectGuid(List<Tuple<string, string>> changedProjectGuids, string line)
+        {
+            foreach (var tuple in changedProjectGuids)
+            {
+                line = line.Replace(tuple.Item1, tuple.Item2);
+            }
+
+            return line;
+        }
+
         private static void SkipProjectLines(IEnumerator enumerator)
         {
             while (enumerator.MoveNext())
@@ -136,10 +132,10 @@
             string[] solutionFileLines,
             List<ProjectInSolution> removedProjects,
             List<ProjectInSolution> updatedProjects,
+            List<Project> newProjects,
+            List<Tuple<string, string>> changedProjectGuids,
             Codebase codebase)
         {
-            var solutionUri = new Uri(solution.GetFullPath());
-
             var removedProjectGuids = removedProjects.Select(p => p.ProjectGuid).ToList();
             var updatedProjectGuids = updatedProjects.Select(p => p.ProjectGuid).ToList();
 
@@ -149,6 +145,8 @@
             {
                 var line = (string)enumerator.Current;
                 Debug.Assert(line != null);
+
+                line = ReplaceProjectGuid(changedProjectGuids, line);
 
                 if (IsProjectLine(line, removedProjectGuids))
                 {
@@ -161,23 +159,30 @@
                 {
                     var projectInSolution = updatedProjects.First(p => p.ProjectGuid == projectGuid);
                     var project = codebase.ProjectsByGuid[Guid.Parse(projectGuid)];
-                    var projectFullPath = GetFileSystemPath(project.FullPath);
-                    var projectUri = new Uri(projectFullPath);
+                    var projectRelativeUri = project.GetRelativePath(solution);
 
-                    var projectRelativeUri = solutionUri.MakeRelativeUri(projectUri);
-                    var newProjectName = Path.GetFileNameWithoutExtension(projectFullPath);
+                    line = line.Replace(projectInSolution.RelativePath, projectRelativeUri.ToFileSystemPath())
+                        .Replace(projectInSolution.ProjectName, project.GetName());
+                }
 
-                    line = line.Replace(
-                            projectInSolution.RelativePath,
-                            projectRelativeUri.ToString().Replace('/', Path.DirectorySeparatorChar))
-                        .Replace(projectInSolution.ProjectName, newProjectName);
+                if (newProjects != null && IsGlobalSectionLine(line))
+                {
+                    foreach (var newProject in newProjects)
+                    {
+                        var guid = newProject.GetProjectGuid().ToString("B").ToUpperInvariant();
+                        var relativePath = newProject.GetRelativePath(solution).ToFileSystemPath();
+                        var typeGuid = newProject.GetSolutionProjectTypeGuid().ToUpperInvariant();
+
+                        yield return $"Project(\"{{{typeGuid}}}\") = \"{newProject.GetName()}\", \"{relativePath}\", \"{{{guid}}}\"";
+                        yield return "EndProject";
+                    }
                 }
 
                 if (IsProjectConfigurationPlatformsSection(line) || IsNestedProjectsSection(line))
                 {
                     yield return line;
 
-                    foreach (var sectionLine in UpdateGlobalSection(enumerator, removedProjectGuids))
+                    foreach (var sectionLine in UpdateGlobalSection(enumerator, removedProjectGuids, changedProjectGuids))
                     {
                         yield return sectionLine;
                     }
@@ -189,7 +194,10 @@
             }
         }
 
-        private static IEnumerable<string> UpdateGlobalSection(IEnumerator enumerator, List<string> removedProjectGuids)
+        private static IEnumerable<string> UpdateGlobalSection(
+            IEnumerator enumerator,
+            List<string> removedProjectGuids,
+            List<Tuple<string, string>> changedProjectGuids)
         {
             while (enumerator.MoveNext())
             {
@@ -199,6 +207,8 @@
                 {
                     continue;
                 }
+
+                line = ReplaceProjectGuid(changedProjectGuids, line);
 
                 yield return line;
 

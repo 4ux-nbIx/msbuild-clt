@@ -88,8 +88,7 @@
         {
             var projects = new List<Project>();
 
-            foreach (var projectInSolution in Solutions.SelectMany(s => s.ProjectsInOrder)
-                .Where(p => p.ProjectType != SolutionProjectType.SolutionFolder))
+            foreach (var projectInSolution in Solutions.SelectMany(s => s.GetMsBuildProjects()))
             {
                 var project = LoadProject(projectInSolution);
 
@@ -108,17 +107,39 @@
 
         private void FixProjectReferences(SolutionFile solution)
         {
-            var missingProjects = solution.ProjectsInOrder
-                .Where(p => p.ProjectType != SolutionProjectType.SolutionFolder && !File.Exists(p.AbsolutePath))
-                .ToList();
+            var missingProjects = solution.GetMsBuildProjects().Where(p => !File.Exists(p.AbsolutePath)).ToList();
 
             var removedProjects = missingProjects.Where(p => !ProjectsByGuid.ContainsKey(Guid.Parse(p.ProjectGuid))).ToList();
             var movedProjects = missingProjects.Except(removedProjects).ToList();
+            var changedProjectGuids = new List<Tuple<string, string>>();
+
+            foreach (var projectInSolution in removedProjects.ToList())
+            {
+                var fileName = Path.GetFileName(projectInSolution.AbsolutePath);
+
+                var projects = ProjectsByFileName
+                    .Where(p => Path.GetFileName(p.Key)?.Equals(fileName, StringComparison.OrdinalIgnoreCase) == true)
+                    .Select(p => p.Value)
+                    .ToList();
+
+                if (projects.Count == 1)
+                {
+                    var newGuid = projects[0].GetProjectGuid().ToString("B").ToUpperInvariant();
+                    changedProjectGuids.Add(Tuple.Create(projectInSolution.ProjectGuid, newGuid));
+
+                    removedProjects.Remove(projectInSolution);
+                    movedProjects.Add(projectInSolution);
+                    projectInSolution.UpdateProjectGuid(newGuid);
+                }
+
+                // TODO: log warning
+            }
+
             // TODO: try to find missing projects by file name
 
             if (removedProjects.Any() || movedProjects.Any())
             {
-                solution.Update(removedProjects, movedProjects, this);
+                solution.Update(removedProjects, movedProjects, null, changedProjectGuids, this);
             }
         }
 
@@ -178,9 +199,7 @@
 
             ProjectsByFileName.Add(absolutePath, project);
 
-            var property = project.GetProperty("ProjectGuid");
-
-            var guid = Guid.Parse(property.EvaluatedValue);
+            var guid = project.GetProjectGuid();
 
             if (ProjectsByGuid.ContainsKey(guid))
             {
