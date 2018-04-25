@@ -11,21 +11,23 @@
 
     using Microsoft.Build.Evaluation;
 
+    using MsBuildProject = Microsoft.Build.Evaluation.Project;
+
     #endregion
 
 
-    public class CodebaseProject
+    public class Project
     {
         private readonly Codebase _codebase;
         private readonly ILogger _logger;
-        private readonly Project _project;
+        private readonly MsBuildProject _project;
 
         [CanBeNull]
-        private List<CodebaseProject> _referencedProjects;
+        private List<Project> _referencedProjects;
 
         private List<Solution> _solutions = new List<Solution>();
 
-        internal CodebaseProject(Codebase codebase, Project project, ILogger logger)
+        internal Project(Codebase codebase, MsBuildProject project, ILogger logger)
         {
             _codebase = codebase;
             _project = project;
@@ -69,14 +71,14 @@
 
         public IList<ProjectItem> AddItem(string itemType, string unevaluatedInclude) => _project.AddItem(itemType, unevaluatedInclude);
 
-        public IEnumerable<CodebaseProject> GetAllReferencedProjects() =>
+        public IEnumerable<Project> GetAllReferencedProjects() =>
             GetReferencedProjects().SelectMany(p => p.GetAllReferencedProjects()).Distinct();
 
         public ICollection<ProjectItem> GetItems(string itemType) => _project.GetItems(itemType);
 
         public ProjectProperty GetProperty(string name) => _project.GetProperty(name);
 
-        public List<CodebaseProject> GetReferencedProjects()
+        public List<Project> GetReferencedProjects()
         {
             if (_referencedProjects != null)
             {

@@ -22,7 +22,7 @@
         private readonly ILogger _logger;
 
         [CanBeNull]
-        private List<CodebaseProject> _projects;
+        private List<Project> _projects;
 
         internal Solution(string fullPath, Codebase codebase, ILogger logger)
         {
@@ -70,19 +70,19 @@
             }
         }
 
-        public IEnumerable<CodebaseProject> GetAllProjects()
+        public IEnumerable<Project> GetAllProjects()
         {
             return GetProjects().SelectMany(p => p.GetAllReferencedProjects()).Distinct();
         }
 
-        public List<CodebaseProject> GetProjects()
+        public List<Project> GetProjects()
         {
             if (_projects != null)
             {
                 return _projects;
             }
 
-            _projects = new List<CodebaseProject>();
+            _projects = new List<Project>();
 
             foreach (var projectInSolution in _file.GetMsBuildProjects())
             {

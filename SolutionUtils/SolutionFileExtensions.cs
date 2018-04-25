@@ -29,7 +29,7 @@
             this Solution solution,
             List<ProjectInSolution> removedProjects,
             List<ProjectInSolution> updatedProjects,
-            List<CodebaseProject> newProjects,
+            List<Project> newProjects,
             List<Tuple<string, string>> changedProjectGuids,
             Codebase codebase)
         {
@@ -131,7 +131,7 @@
             string[] solutionFileLines,
             List<ProjectInSolution> removedProjects,
             List<ProjectInSolution> updatedProjects,
-            List<CodebaseProject> newProjects,
+            List<Project> newProjects,
             List<Tuple<string, string>> changedProjectGuids,
             Codebase codebase)
         {

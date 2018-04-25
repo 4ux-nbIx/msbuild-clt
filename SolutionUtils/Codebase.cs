@@ -30,9 +30,9 @@
             _projectCollection = new ProjectCollection(ToolsetDefinitionLocations.Registry);
         }
 
-        public Dictionary<string, CodebaseProject> ProjectsByFileName { get; } = new Dictionary<string, CodebaseProject>();
-        public Dictionary<Guid, CodebaseProject> ProjectsByGuid { get; } = new Dictionary<Guid, CodebaseProject>();
-        public Dictionary<Guid, CodebaseProject> ProjectsWithDuplicateGuid { get; } = new Dictionary<Guid, CodebaseProject>();
+        public Dictionary<string, Project> ProjectsByFileName { get; } = new Dictionary<string, Project>();
+        public Dictionary<Guid, Project> ProjectsByGuid { get; } = new Dictionary<Guid, Project>();
+        public Dictionary<Guid, Project> ProjectsWithDuplicateGuid { get; } = new Dictionary<Guid, Project>();
 
         public List<Solution> Solutions { get; set; }
 
@@ -83,20 +83,20 @@
             }
         }
 
-        public IEnumerable<CodebaseProject> GetAllProjects()
+        public IEnumerable<Project> GetAllProjects()
         {
             return Solutions.SelectMany(s => s.GetAllProjects()).Distinct();
         }
 
         [CanBeNull]
-        internal CodebaseProject LoadProject(ProjectInSolution projectInSolution) => LoadProject(projectInSolution.AbsolutePath);
+        internal Project LoadProject(ProjectInSolution projectInSolution) => LoadProject(projectInSolution.AbsolutePath);
 
         [CanBeNull]
-        internal CodebaseProject LoadProject(string absolutePath)
+        internal Project LoadProject(string absolutePath)
         {
             absolutePath = Path.GetFullPath(absolutePath).ToLowerInvariant();
 
-            CodebaseProject project;
+            Project project;
 
             if (ProjectsByFileName.TryGetValue(absolutePath, out project))
             {
@@ -110,7 +110,7 @@
 
             try
             {
-                var msbuildProject = new Project(
+                var msbuildProject = new Microsoft.Build.Evaluation.Project(
                     absolutePath,
                     _projectCollection.GlobalProperties,
                     _projectCollection.DefaultToolsVersion,
@@ -119,7 +119,7 @@
                     | ProjectLoadSettings.IgnoreInvalidImports
                     | ProjectLoadSettings.IgnoreMissingImports);
 
-                project = new CodebaseProject(this, msbuildProject, _logger);
+                project = new Project(this, msbuildProject, _logger);
             }
             catch (Exception exception)
             {

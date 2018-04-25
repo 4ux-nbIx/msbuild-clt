@@ -14,7 +14,7 @@
     {
         private const string _projectReferenceItemType = "ProjectReference";
 
-        public static Guid GetProjectGuid(this Project project)
+        public static Guid GetProjectGuid(this Microsoft.Build.Evaluation.Project project)
         {
             var property = project.GetProperty("ProjectGuid");
 
@@ -22,7 +22,7 @@
             return guid;
         }
 
-        public static ICollection<ProjectItem> GetProjectReferences(this Project project) =>
+        public static ICollection<ProjectItem> GetProjectReferences(this Microsoft.Build.Evaluation.Project project) =>
             project.GetItemsIgnoringCondition(_projectReferenceItemType);
     }
 }
