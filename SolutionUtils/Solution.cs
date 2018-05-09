@@ -46,10 +46,7 @@
             {
                 var fileName = Path.GetFileName(projectInSolution.AbsolutePath);
 
-                var projects = _codebase.ProjectsByFileName
-                    .Where(p => Path.GetFileName(p.Key)?.Equals(fileName, StringComparison.OrdinalIgnoreCase) == true)
-                    .Select(p => p.Value)
-                    .ToList();
+                var projects = _codebase.FindProjectsByFileName(fileName);
 
                 if (projects.Count == 1)
                 {
@@ -64,14 +61,25 @@
                 // TODO: log warning
             }
 
+            foreach (var project in GetAllProjects())
+            {
+                project.FixProjectReferences();
+            }
+
+            var fileProjectsByGuid = _file.ProjectsByGuid.ToDictionary(p => Guid.Parse(p.Key), p => p.Value);
+            var newProjects = GetAllProjects(true).Where(p => !fileProjectsByGuid.ContainsKey(p.Guid)).ToList();
+
             if (removedProjects.Any() || movedProjects.Any())
             {
-                this.Update(removedProjects, movedProjects, null, changedProjectGuids, _codebase);
+                this.Update(removedProjects, movedProjects, newProjects, changedProjectGuids, _codebase);
             }
         }
 
-        public IEnumerable<Project> GetAllProjects() =>
-            GetProjects().Where(p => !p.IsNotSupported).SelectMany(p => p.GetAllReferencedProjects()).Distinct();
+        public IEnumerable<Project> GetAllProjects(bool includeUnsupported = false) =>
+            GetProjects()
+                .Where(p => includeUnsupported || !p.IsNotSupported)
+                .SelectMany(p => p.GetAllReferencedProjects(includeUnsupported))
+                .Distinct();
 
         public List<Project> GetProjects()
         {

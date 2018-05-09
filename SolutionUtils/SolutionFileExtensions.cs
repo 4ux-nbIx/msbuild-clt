@@ -160,7 +160,7 @@
                     var project = codebase.ProjectsByGuid[Guid.Parse(projectGuid)];
                     var projectRelativeUri = project.GetRelativePath(solution);
 
-                    line = line.Replace(projectInSolution.RelativePath, projectRelativeUri.ToFileSystemPath())
+                    line = line.Replace(projectInSolution.RelativePath, projectRelativeUri)
                         .Replace(projectInSolution.ProjectName, project.Name);
                 }
 
@@ -169,7 +169,7 @@
                     foreach (var newProject in newProjects)
                     {
                         var guid = newProject.Guid.ToString("B").ToUpperInvariant();
-                        var relativePath = newProject.GetRelativePath(solution).ToFileSystemPath();
+                        var relativePath = newProject.GetRelativePath(solution);
                         var typeGuid = newProject.SolutionProjectTypeGuid;
 
                         yield return $"Project(\"{{{typeGuid}}}\") = \"{newProject.Name}\", \"{relativePath}\", \"{{{guid}}}\"";

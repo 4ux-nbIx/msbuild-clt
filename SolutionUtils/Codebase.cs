@@ -50,6 +50,13 @@
             return new Codebase(folder, new[] { solution }, logger);
         }
 
+        public List<Project> FindProjectsByFileName(string fileName)
+        {
+            return ProjectsByFileName.Where(p => Path.GetFileName(p.Key)?.Equals(fileName, StringComparison.OrdinalIgnoreCase) == true)
+                .Select(p => p.Value)
+                .ToList();
+        }
+
         public IEnumerable<string> FindUnreferencedProjects()
         {
             var projectExtensions = GetAllProjects().Select(p => Path.GetExtension(p.FullPath)).Distinct().ToList();
@@ -89,7 +96,8 @@
         }
 
         [CanBeNull]
-        internal Project LoadProject(ProjectInSolution projectInSolution) => LoadProject(projectInSolution.AbsolutePath, Guid.Parse(projectInSolution.ProjectGuid));
+        internal Project LoadProject(ProjectInSolution projectInSolution) =>
+            LoadProject(projectInSolution.AbsolutePath, Guid.Parse(projectInSolution.ProjectGuid));
 
         [CanBeNull]
         internal Project LoadProject(string absolutePath, Guid guid = default(Guid))

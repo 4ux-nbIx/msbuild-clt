@@ -47,5 +47,12 @@
         }
 
         public static string ToFileSystemPath(this Uri uri) => uri.ToString().Replace('/', Path.DirectorySeparatorChar);
+
+        public static string ToRelativePath(this string path, string toPath)
+        {
+            var projectUri = new Uri(path);
+
+            return new Uri(toPath).MakeRelativeUri(projectUri).ToFileSystemPath();
+        }
     }
 }

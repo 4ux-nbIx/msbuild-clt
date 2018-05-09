@@ -93,6 +93,7 @@
     <Compile Include="AssemblyLoader.cs" />
     <Compile Include="AssemblyReference.cs" />
     <Compile Include="Codebase.cs" />
+    <Compile Include="GuidExtensions.cs" />
     <Compile Include="Project.cs" />
     <Compile Include="ConsoleLogger.cs" />
     <Compile Include="FileSystemUtils.cs" />

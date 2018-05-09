@@ -38,7 +38,7 @@
             _codebase = codebase;
             _logger = logger;
 
-            FullPath = absolutePath;
+            FullPath = absolutePath.GetFileSystemPath();
             Guid = guid;
             Name = Path.GetFileNameWithoutExtension(absolutePath);
         }
@@ -78,8 +78,56 @@
 
         public IList<ProjectItem> AddItem(string itemType, string unevaluatedInclude) => GetProject().AddItem(itemType, unevaluatedInclude);
 
-        public IEnumerable<Project> GetAllReferencedProjects() =>
-            GetReferencedProjects().Where(p => !p.IsNotSupported).SelectMany(p => p.GetAllReferencedProjects()).Distinct();
+        public void FixProjectReferences()
+        {
+            var brokenReferences = GetProject()
+                .GetProjectReferences()
+                .Select(r => GetProjectReferencePathAndGuid(r))
+                .Where(p => !_codebase.ProjectsByFileName.ContainsKey(p.fullPath))
+                .ToList();
+
+            foreach (var brokenReference in brokenReferences)
+            {
+                var fileName = Path.GetFileName(brokenReference.fullPath);
+
+                var projects = _codebase.FindProjectsByFileName(fileName);
+
+                if (projects.Count == 1)
+                {
+                    FixProjectReference(brokenReference.item, projects[0]);
+                }
+
+                if (_codebase.ProjectsByGuid.TryGetValue(brokenReference.guid, out var project))
+                {
+                    FixProjectReference(brokenReference.item, project);
+
+                    continue;
+                }
+
+                _logger.WriteWarning($"Failed to resolve project {Name} reference.");
+            }
+
+            if (!IsDirty)
+            {
+                return;
+            }
+
+            GetProject().Save();
+            _referencedProjects = null;
+        }
+
+        public IEnumerable<Project> GetAllReferencedProjects(bool includeUnsupported = false)
+        {
+            if (includeUnsupported && IsNotSupported)
+            {
+                return Enumerable.Empty<Project>();
+            }
+
+            return GetReferencedProjects()
+                .Where(p => includeUnsupported || !p.IsNotSupported)
+                .SelectMany(p => p.GetAllReferencedProjects(includeUnsupported))
+                .Distinct();
+        }
 
         public ICollection<ProjectItem> GetItems(string itemType) => GetProject().GetItems(itemType);
 
@@ -94,12 +142,7 @@
 
             _referencedProjects = GetProject()
                 .GetProjectReferences()
-                .Select(
-                    r => new
-                    {
-                        fullPath = Path.GetFullPath(Path.Combine(DirectoryPath, r.EvaluatedInclude)),
-                        guid = Guid.Parse(r.GetMetadataValue("Project"))
-                    })
+                .Select(r => GetProjectReferencePathAndGuid(r))
                 .Select(p => _codebase.LoadProject(p.fullPath, p.guid))
                 .Where(p => p != null)
                 .Distinct()
@@ -113,17 +156,17 @@
             return _referencedProjects;
         }
 
-        public Uri GetRelativePath(Solution solution)
-        {
-            var projectFullPath = FullPath.GetFileSystemPath();
-            var projectUri = new Uri(projectFullPath);
-
-            return new Uri(solution.FullPath).MakeRelativeUri(projectUri);
-        }
+        public string GetRelativePath(Solution solution) => FullPath.ToRelativePath(solution.FullPath);
 
         public void Save() => GetProject().Save();
 
         internal void AddSolution(Solution solution) => _solutions.Add(solution);
+
+        private void FixProjectReference(ProjectItem projectItem, Project project)
+        {
+            projectItem.UnevaluatedInclude = project.FullPath.ToRelativePath(FullPath);
+            projectItem.SetMetadataValue("Project", project.Guid.ToString("B"));
+        }
 
         private MsBuildProject GetProject()
         {
@@ -134,5 +177,8 @@
 
             return _project;
         }
+
+        private (string fullPath, Guid guid, ProjectItem item) GetProjectReferencePathAndGuid(ProjectItem r) =>
+            (Path.GetFullPath(Path.Combine(DirectoryPath, r.EvaluatedInclude)), Guid.Parse(r.GetMetadataValue("Project")), r);
     }
 }
