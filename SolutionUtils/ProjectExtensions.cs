@@ -5,6 +5,8 @@
     using System;
     using System.Collections.Generic;
 
+    using JetBrains.Annotations;
+
     using Microsoft.Build.Evaluation;
 
     #endregion
@@ -14,7 +16,7 @@
     {
         private const string _projectReferenceItemType = "ProjectReference";
 
-        public static Guid GetProjectGuid(this Microsoft.Build.Evaluation.Project project)
+        public static Guid GetProjectGuid([NotNull] this Microsoft.Build.Evaluation.Project project)
         {
             var property = project.GetProperty("ProjectGuid");
 
@@ -22,7 +24,7 @@
             return guid;
         }
 
-        public static ICollection<ProjectItem> GetProjectReferences(this Microsoft.Build.Evaluation.Project project) =>
+        public static ICollection<ProjectItem> GetProjectReferences([NotNull] this Microsoft.Build.Evaluation.Project project) =>
             project.GetItemsIgnoringCondition(_projectReferenceItemType);
     }
 }

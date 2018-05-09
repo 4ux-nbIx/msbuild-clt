@@ -70,10 +70,8 @@
             }
         }
 
-        public IEnumerable<Project> GetAllProjects()
-        {
-            return GetProjects().SelectMany(p => p.GetAllReferencedProjects()).Distinct();
-        }
+        public IEnumerable<Project> GetAllProjects() =>
+            GetProjects().Where(p => !p.IsNotSupported).SelectMany(p => p.GetAllReferencedProjects()).Distinct();
 
         public List<Project> GetProjects()
         {

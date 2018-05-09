@@ -20,6 +20,8 @@
     {
         private readonly Codebase _codebase;
         private readonly ILogger _logger;
+
+        [CanBeNull]
         private readonly MsBuildProject _project;
 
         [CanBeNull]
@@ -28,27 +30,32 @@
         private List<Solution> _solutions = new List<Solution>();
 
         internal Project(Codebase codebase, MsBuildProject project, ILogger logger)
+            : this(codebase, project.FullPath.GetFileSystemPath(), project.GetProjectGuid(), logger) =>
+            _project = project;
+
+        internal Project(Codebase codebase, string absolutePath, Guid guid, ILogger logger)
         {
             _codebase = codebase;
-            _project = project;
             _logger = logger;
 
-            Guid = _project.GetProjectGuid();
-            Name = Path.GetFileNameWithoutExtension(project.FullPath.GetFileSystemName(out _));
+            FullPath = absolutePath;
+            Guid = guid;
+            Name = Path.GetFileNameWithoutExtension(absolutePath);
         }
 
-        public string DirectoryPath => _project.DirectoryPath;
-
-        public string FullPath => _project.FullPath;
+        public string DirectoryPath => _project?.DirectoryPath ?? Path.GetDirectoryName(FullPath);
+        public string FullPath { get; }
         public Guid Guid { get; }
-        public bool IsDirty => _project.IsDirty;
+        public bool IsDirty => _project?.IsDirty ?? false;
+
+        public bool IsNotSupported => _project == null;
         public string Name { get; }
 
         public string SolutionProjectTypeGuid
         {
             get
             {
-                var extension = Path.GetExtension(_project.FullPath)?.ToLowerInvariant();
+                var extension = Path.GetExtension(FullPath)?.ToLowerInvariant();
 
                 switch (extension)
                 {
@@ -67,16 +74,16 @@
         public IReadOnlyList<Solution> Solutions => _solutions;
 
         public IList<ProjectItem> AddItem(string itemType, string unevaluatedInclude, IEnumerable<KeyValuePair<string, string>> metadata) =>
-            _project.AddItem(itemType, unevaluatedInclude, metadata);
+            GetProject().AddItem(itemType, unevaluatedInclude, metadata);
 
-        public IList<ProjectItem> AddItem(string itemType, string unevaluatedInclude) => _project.AddItem(itemType, unevaluatedInclude);
+        public IList<ProjectItem> AddItem(string itemType, string unevaluatedInclude) => GetProject().AddItem(itemType, unevaluatedInclude);
 
         public IEnumerable<Project> GetAllReferencedProjects() =>
-            GetReferencedProjects().SelectMany(p => p.GetAllReferencedProjects()).Distinct();
+            GetReferencedProjects().Where(p => !p.IsNotSupported).SelectMany(p => p.GetAllReferencedProjects()).Distinct();
 
-        public ICollection<ProjectItem> GetItems(string itemType) => _project.GetItems(itemType);
+        public ICollection<ProjectItem> GetItems(string itemType) => GetProject().GetItems(itemType);
 
-        public ProjectProperty GetProperty(string name) => _project.GetProperty(name);
+        public ProjectProperty GetProperty(string name) => GetProject().GetProperty(name);
 
         public List<Project> GetReferencedProjects()
         {
@@ -85,9 +92,15 @@
                 return _referencedProjects;
             }
 
-            _referencedProjects = _project.GetProjectReferences()
-                .Select(i => Path.GetFullPath(Path.Combine(_project.DirectoryPath, i.EvaluatedInclude)))
-                .Select(p => _codebase.LoadProject(p))
+            _referencedProjects = GetProject()
+                .GetProjectReferences()
+                .Select(
+                    r => new
+                    {
+                        fullPath = Path.GetFullPath(Path.Combine(DirectoryPath, r.EvaluatedInclude)),
+                        guid = Guid.Parse(r.GetMetadataValue("Project"))
+                    })
+                .Select(p => _codebase.LoadProject(p.fullPath, p.guid))
                 .Where(p => p != null)
                 .Distinct()
                 .ToList();
@@ -102,20 +115,24 @@
 
         public Uri GetRelativePath(Solution solution)
         {
-            var projectFullPath = _project.FullPath.GetFileSystemPath();
+            var projectFullPath = FullPath.GetFileSystemPath();
             var projectUri = new Uri(projectFullPath);
 
             return new Uri(solution.FullPath).MakeRelativeUri(projectUri);
         }
 
-        public void Save()
-        {
-            _project.Save();
-        }
+        public void Save() => GetProject().Save();
 
-        internal void AddSolution(Solution solution)
+        internal void AddSolution(Solution solution) => _solutions.Add(solution);
+
+        private MsBuildProject GetProject()
         {
-            _solutions.Add(solution);
+            if (_project == null)
+            {
+                throw new InvalidOperationException("The project could not be loaded.");
+            }
+
+            return _project;
         }
     }
 }

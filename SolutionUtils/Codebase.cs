@@ -89,10 +89,10 @@
         }
 
         [CanBeNull]
-        internal Project LoadProject(ProjectInSolution projectInSolution) => LoadProject(projectInSolution.AbsolutePath);
+        internal Project LoadProject(ProjectInSolution projectInSolution) => LoadProject(projectInSolution.AbsolutePath, Guid.Parse(projectInSolution.ProjectGuid));
 
         [CanBeNull]
-        internal Project LoadProject(string absolutePath)
+        internal Project LoadProject(string absolutePath, Guid guid = default(Guid))
         {
             absolutePath = Path.GetFullPath(absolutePath).ToLowerInvariant();
 
@@ -124,7 +124,7 @@
             catch (Exception exception)
             {
                 _logger.WriteWarning($"Failed to load {absolutePath}\n{exception.Message}");
-                return null;
+                project = new Project(this, absolutePath, guid, _logger);
             }
 
             ProjectsByFileName.Add(absolutePath, project);
