@@ -36,13 +36,20 @@
 
         public void FixProjectReferences()
         {
+            var projectsByGuid = _file.GetMsBuildProjects().ToDictionary(p => Guid.Parse(p.ProjectGuid), p => p);
             var missingProjects = _file.GetMsBuildProjects().Where(p => !File.Exists(p.AbsolutePath)).ToList();
 
             var removedProjects = missingProjects.Where(p => !_codebase.ProjectsByGuid.ContainsKey(Guid.Parse(p.ProjectGuid))).ToList();
             var movedProjects = missingProjects.Except(removedProjects).ToList();
-            var changedProjectGuids = new List<Tuple<string, string>>();
 
-            foreach (var projectInSolution in removedProjects.ToList())
+            var projectsWithNewGuids = projectsByGuid.Where(p => !_codebase.ProjectsByGuid.ContainsKey(p.Key))
+                .Select(p => p.Value)
+                .Except(removedProjects)
+                .ToList();
+
+            var changedProjectGuids = new Dictionary<string, string>();
+
+            foreach (var projectInSolution in removedProjects.Concat(projectsWithNewGuids).ToList())
             {
                 var fileName = Path.GetFileName(projectInSolution.AbsolutePath);
 
@@ -50,15 +57,18 @@
 
                 if (projects.Count == 1)
                 {
-                    var newGuid = projects[0].Guid.ToString("B").ToUpperInvariant();
-                    changedProjectGuids.Add(Tuple.Create(projectInSolution.ProjectGuid, newGuid));
+                    var newGuid = projects[0].Guid.ToSolutionProjectGuid();
+                    changedProjectGuids.Add(projectInSolution.ProjectGuid, newGuid);
 
                     removedProjects.Remove(projectInSolution);
                     movedProjects.Add(projectInSolution);
                     projectInSolution.UpdateProjectGuid(newGuid);
                 }
-
-                // TODO: log warning
+                else if (projects.Count > 0)
+                {
+                    _logger.WriteWarning(
+                        $"Could not resolve project reference '{projectInSolution.ProjectName}' in solution '{FullPath}': project with same GUID not found, but found {projects.Count} projects by file name.");
+                }
             }
 
             foreach (var project in GetAllProjects())
@@ -66,20 +76,25 @@
                 project.FixProjectReferences();
             }
 
-            var fileProjectsByGuid = _file.ProjectsByGuid.ToDictionary(p => Guid.Parse(p.Key), p => p.Value);
-            var newProjects = GetAllProjects(true).Where(p => !fileProjectsByGuid.ContainsKey(p.Guid)).ToList();
+            var allProjects = GetAllProjects(true).ToList();
 
-            if (removedProjects.Any() || movedProjects.Any())
+            var newProjects = allProjects
+                .Where(p => !projectsByGuid.ContainsKey(p.Guid) && !changedProjectGuids.Values.Contains(p.Guid.ToSolutionProjectGuid()))
+                .Distinct()
+                .ToList();
+
+            if (removedProjects.Any() || movedProjects.Any() || newProjects.Any())
             {
                 this.Update(removedProjects, movedProjects, newProjects, changedProjectGuids, _codebase);
             }
         }
 
-        public IEnumerable<Project> GetAllProjects(bool includeUnsupported = false) =>
-            GetProjects()
-                .Where(p => includeUnsupported || !p.IsNotSupported)
-                .SelectMany(p => p.GetAllReferencedProjects(includeUnsupported))
-                .Distinct();
+        public IEnumerable<Project> GetAllProjects(bool includeUnsupported = false)
+        {
+            var projects = GetProjects().Where(p => includeUnsupported || !p.IsNotSupported).ToList();
+
+            return projects.Concat(projects.SelectMany(p => p.GetAllReferencedProjects(includeUnsupported))).Distinct();
+        }
 
         public List<Project> GetProjects()
         {

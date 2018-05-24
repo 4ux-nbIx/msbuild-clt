@@ -83,7 +83,7 @@
             var brokenReferences = GetProject()
                 .GetProjectReferences()
                 .Select(r => GetProjectReferencePathAndGuid(r))
-                .Where(p => !_codebase.ProjectsByFileName.ContainsKey(p.fullPath))
+                .Where(p => !_codebase.ProjectsByFileName.ContainsKey(p.fullPath.ToLowerInvariant()))
                 .ToList();
 
             foreach (var brokenReference in brokenReferences)
@@ -123,10 +123,9 @@
                 return Enumerable.Empty<Project>();
             }
 
-            return GetReferencedProjects()
-                .Where(p => includeUnsupported || !p.IsNotSupported)
-                .SelectMany(p => p.GetAllReferencedProjects(includeUnsupported))
-                .Distinct();
+            var projects = GetReferencedProjects().Where(p => includeUnsupported || !p.IsNotSupported).ToList();
+
+            return projects.Concat(projects.SelectMany(p => p.GetAllReferencedProjects(includeUnsupported))).Distinct();
         }
 
         public ICollection<ProjectItem> GetItems(string itemType) => GetProject().GetItems(itemType);
@@ -159,6 +158,8 @@
         public string GetRelativePath(Solution solution) => FullPath.ToRelativePath(solution.FullPath);
 
         public void Save() => GetProject().Save();
+
+        public override string ToString() => $"{nameof(FullPath)}: {FullPath}, {nameof(Guid)}: {Guid}";
 
         internal void AddSolution(Solution solution) => _solutions.Add(solution);
 

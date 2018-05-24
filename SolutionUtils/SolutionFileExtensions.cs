@@ -30,7 +30,7 @@
             List<ProjectInSolution> removedProjects,
             List<ProjectInSolution> updatedProjects,
             List<Project> newProjects,
-            List<Tuple<string, string>> changedProjectGuids,
+            Dictionary<string, string> changedProjectGuids,
             Codebase codebase)
         {
             var path = solution.FullPath;
@@ -103,11 +103,11 @@
             return false;
         }
 
-        private static string ReplaceProjectGuid(List<Tuple<string, string>> changedProjectGuids, string line)
+        private static string ReplaceProjectGuid(Dictionary<string, string> changedProjectGuids, string line)
         {
             foreach (var tuple in changedProjectGuids)
             {
-                line = line.Replace(tuple.Item1, tuple.Item2);
+                line = line.Replace(tuple.Key, tuple.Value);
             }
 
             return line;
@@ -132,7 +132,7 @@
             List<ProjectInSolution> removedProjects,
             List<ProjectInSolution> updatedProjects,
             List<Project> newProjects,
-            List<Tuple<string, string>> changedProjectGuids,
+            Dictionary<string, string> changedProjectGuids,
             Codebase codebase)
         {
             var removedProjectGuids = removedProjects.Select(p => p.ProjectGuid).ToList();
@@ -168,11 +168,11 @@
                 {
                     foreach (var newProject in newProjects)
                     {
-                        var guid = newProject.Guid.ToString("B").ToUpperInvariant();
+                        var guid = newProject.Guid.ToSolutionProjectGuid();
                         var relativePath = newProject.GetRelativePath(solution);
                         var typeGuid = newProject.SolutionProjectTypeGuid;
 
-                        yield return $"Project(\"{{{typeGuid}}}\") = \"{newProject.Name}\", \"{relativePath}\", \"{{{guid}}}\"";
+                        yield return $"Project(\"{typeGuid}\") = \"{newProject.Name}\", \"{relativePath}\", \"{guid}\"";
                         yield return "EndProject";
                     }
                 }
@@ -196,7 +196,7 @@
         private static IEnumerable<string> UpdateGlobalSection(
             IEnumerator enumerator,
             List<string> removedProjectGuids,
-            List<Tuple<string, string>> changedProjectGuids)
+            Dictionary<string, string> changedProjectGuids)
         {
             while (enumerator.MoveNext())
             {
