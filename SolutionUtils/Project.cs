@@ -40,7 +40,7 @@
 
             FullPath = absolutePath.GetFileSystemPath();
             Guid = guid;
-            Name = Path.GetFileNameWithoutExtension(absolutePath);
+            Name = Path.GetFileNameWithoutExtension(FullPath);
         }
 
         public string DirectoryPath => _project?.DirectoryPath ?? Path.GetDirectoryName(FullPath);

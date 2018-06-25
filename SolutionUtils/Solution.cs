@@ -17,9 +17,8 @@
     public class Solution
     {
         private readonly Codebase _codebase;
-        private readonly SolutionFile _file;
-        private readonly string _fullPath;
         private readonly ILogger _logger;
+        private SolutionFile _file;
 
         [CanBeNull]
         private List<Project> _projects;
@@ -27,12 +26,13 @@
         internal Solution(string fullPath, Codebase codebase, ILogger logger)
         {
             _file = SolutionFile.Parse(fullPath);
-            _fullPath = fullPath;
+            FullPath = fullPath;
             _codebase = codebase;
             _logger = logger;
         }
 
-        public string FullPath => _fullPath;
+        public string FileName => Path.GetFileName(FullPath);
+        public string FullPath { get; }
 
         public void FixProjectReferences()
         {
@@ -78,16 +78,14 @@
 
             var allProjects = GetAllProjects(true).ToList();
 
-            var newProjects = allProjects
-                .Where(p => !projectsByGuid.ContainsKey(p.Guid) && !changedProjectGuids.Values.Contains(p.Guid.ToSolutionProjectGuid()))
+            var newProjects = allProjects.Where(
+                    p => !projectsByGuid.ContainsKey(p.Guid) && !changedProjectGuids.Values.Contains(p.Guid.ToSolutionProjectGuid()))
                 .Distinct()
                 .ToList();
 
-            if (removedProjects.Any() || movedProjects.Any() || newProjects.Any())
-            {
-                this.Update(removedProjects, movedProjects, newProjects, changedProjectGuids, _codebase);
-            }
+            Update(removedProjects, movedProjects, newProjects, changedProjectGuids);
         }
+
 
         public IEnumerable<Project> GetAllProjects(bool includeUnsupported = false)
         {
@@ -120,6 +118,49 @@
             }
 
             return _projects;
+        }
+
+        public void Merge(Solution solution)
+        {
+            var existingProjects = _file.ProjectsInOrder.Select(p => Guid.Parse(p.ProjectGuid)).ToList();
+
+            var newProjects = solution.GetProjects().Where(p => !existingProjects.Contains(p.Guid)).ToList();
+
+            Update(null, null, newProjects, null);
+        }
+
+        public override string ToString() => $"{nameof(FileName)}: {FileName}, {nameof(FullPath)}: {FullPath}";
+
+        private void Update(
+            [CanBeNull] List<ProjectInSolution> removedProjects,
+            [CanBeNull] List<ProjectInSolution> updatedProjects,
+            [CanBeNull] List<Project> newProjects,
+            [CanBeNull] Dictionary<string, string> changedProjectGuids)
+        {
+            if ((removedProjects == null || removedProjects.Count == 0)
+                && (updatedProjects == null || updatedProjects.Count == 0)
+                && (newProjects == null || newProjects.Count == 0)
+                && (changedProjectGuids == null || changedProjectGuids.Count == 0))
+            {
+                return;
+            }
+
+            var path = FullPath;
+
+            var newLines = this.Update(
+                    File.ReadAllLines(path),
+                    removedProjects,
+                    updatedProjects,
+                    newProjects,
+                    changedProjectGuids,
+                    _codebase)
+                .ToList();
+
+            File.WriteAllLines(path, newLines);
+
+            _file = SolutionFile.Parse(FullPath);
+
+            _projects = null;
         }
     }
 }

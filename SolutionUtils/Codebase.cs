@@ -11,6 +11,7 @@
 
     using Microsoft.Build.Construction;
     using Microsoft.Build.Evaluation;
+    using Microsoft.Build.Globbing;
 
     #endregion
 
@@ -20,21 +21,35 @@
         private readonly ILogger _logger;
         private string _folder;
         private ProjectCollection _projectCollection;
+        private List<Solution> _solutions = new List<Solution>();
 
         private Codebase(string folder, IEnumerable<string> solutions, ILogger logger)
         {
             _folder = folder;
             _logger = logger;
-            Solutions = solutions.Select(f => new Solution(f, this, logger)).ToList();
+
+            foreach (var solution in solutions)
+            {
+                LoadSolution(solution);
+            }
 
             _projectCollection = new ProjectCollection(ToolsetDefinitionLocations.Registry);
+        }
+
+        private Solution LoadSolution(string f)
+        {
+            var solution = new Solution(f, this, _logger);
+
+            _solutions.Add(solution);
+
+            return solution;
         }
 
         public Dictionary<string, Project> ProjectsByFileName { get; } = new Dictionary<string, Project>();
         public Dictionary<Guid, Project> ProjectsByGuid { get; } = new Dictionary<Guid, Project>();
         public Dictionary<Guid, Project> ProjectsWithDuplicateGuid { get; } = new Dictionary<Guid, Project>();
 
-        public List<Solution> Solutions { get; set; }
+        public IReadOnlyCollection<Solution> Solutions => _solutions;
 
         public static Codebase CreateFromFolder(string folder, ILogger logger)
         {
@@ -147,6 +162,37 @@
             }
 
             return project;
+        }
+
+        public void MergeSolutions(string destinationSolutionPath, IReadOnlyList<string> excludedSolutions)
+        {
+            var excludeGlob = new CompositeGlob(excludedSolutions.Select(s => MSBuildGlob.Parse(_folder, s)));
+            var solutionsToMerge = Solutions.Where(s => !excludeGlob.IsMatch(s.FullPath)).ToList();
+
+            if (solutionsToMerge.Count == 0)
+            {
+                _logger.WriteInfo("No solutions found.");
+            }
+
+            var fullSolutionPath = Path.Combine(_folder, destinationSolutionPath);
+
+            var targetSolution =
+                Solutions.FirstOrDefault(s => s.FullPath.Equals(fullSolutionPath, StringComparison.InvariantCultureIgnoreCase));
+
+            if (targetSolution == null)
+            {
+                var solution = solutionsToMerge[0];
+                solutionsToMerge.RemoveAt(0);
+
+                File.Copy(solution.FullPath, fullSolutionPath, false);
+
+                targetSolution = LoadSolution(fullSolutionPath);
+            }
+
+            foreach (var solution in solutionsToMerge.Where(s => s != targetSolution))
+            {
+                targetSolution.Merge(solution);
+            }
         }
     }
 }

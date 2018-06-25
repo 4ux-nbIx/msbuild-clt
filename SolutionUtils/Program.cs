@@ -149,6 +149,25 @@
                 });
         }
 
+        private static void ConfigureMergeSolutionsCommand(CommandLineApplication command)
+        {
+            command.Description = "Merges solution files.";
+            command.HelpOption(_helpOptionTemplate);
+
+            var pathArgument = command.Argument("path", "Worspace folder path");
+            var targetArgument = command.Argument("target-solution", "Target solution file name.");
+            var excludeOption = command.Option<string>("--exclude <EXCLUDE>", "Solution files to exclude", CommandOptionType.MultipleValue);
+
+            command.OnExecute(
+                () =>
+                {
+                    var path = pathArgument.Value;
+
+                    var codebase = Codebase.CreateFromFolder(path, _logger);
+                    codebase.MergeSolutions(targetArgument.Value, excludeOption.ParsedValues);
+                });
+        }
+
         private static void Main(string[] args)
         {
             _logger = new ConsoleLogger();
@@ -170,7 +189,7 @@
                 "find",
                 command =>
                 {
-                    command.Description = "Finds stuff.";
+                    command.Description = "TODO";
                     command.HelpOption(_helpOptionTemplate);
 
                     command.Command("unreferenced-projects", ConfigureFindUnreferencedProjectsCommand);
@@ -180,11 +199,21 @@
                 "fix",
                 command =>
                 {
-                    command.Description = "Fixes stuff.";
+                    command.Description = "TODO";
                     command.HelpOption(_helpOptionTemplate);
 
                     command.Command("assembly-bindings",  ConfigureFixAssemblyBindingsCommand);
                     command.Command("project-references", ConfigureFixProjectReferencesCommand);
+                });
+
+            application.Command(
+                "merge",
+                command =>
+                {
+                    command.Description = "TODO";
+                    command.HelpOption(_helpOptionTemplate);
+
+                    command.Command("solutions", ConfigureMergeSolutionsCommand);
                 });
 
             application.Execute(args);

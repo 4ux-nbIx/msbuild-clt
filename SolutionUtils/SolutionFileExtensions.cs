@@ -6,7 +6,6 @@
     using System.Collections;
     using System.Collections.Generic;
     using System.Diagnostics;
-    using System.IO;
     using System.Linq;
     using System.Reflection;
 
@@ -25,28 +24,6 @@
         public static IEnumerable<ProjectInSolution> GetMsBuildProjects(this SolutionFile solution) =>
             solution.ProjectsInOrder.Where(p => p.ProjectType != SolutionProjectType.SolutionFolder);
 
-        public static void Update(
-            this Solution solution,
-            List<ProjectInSolution> removedProjects,
-            List<ProjectInSolution> updatedProjects,
-            List<Project> newProjects,
-            Dictionary<string, string> changedProjectGuids,
-            Codebase codebase)
-        {
-            var path = solution.FullPath;
-
-            var newLines = solution.Update(
-                    File.ReadAllLines(path),
-                    removedProjects,
-                    updatedProjects,
-                    newProjects,
-                    changedProjectGuids,
-                    codebase)
-                .ToList();
-
-            File.WriteAllLines(path, newLines);
-        }
-
         public static void UpdateProjectGuid(this ProjectInSolution projectInSolution, string guid)
         {
             projectInSolution.GetType().GetProperty(nameof(ProjectInSolution.ProjectGuid))?.SetValue(projectInSolution, guid);
@@ -54,8 +31,13 @@
 
         private static bool IsGlobalSectionLine(string line) => line.TrimStart().Equals("Global", StringComparison.Ordinal);
 
-        private static bool IsGlobalSectionProjectLine(string line, List<string> projectGuids)
+        private static bool IsGlobalSectionProjectLine(string line, [CanBeNull] IReadOnlyCollection<string> projectGuids)
         {
+            if (projectGuids == null)
+            {
+                return false;
+            }
+
             line = line.TrimStart();
 
             foreach (var guid in projectGuids)
@@ -77,13 +59,13 @@
 
         private static bool IsProjectLine([NotNull] string line) => line.TrimStart().StartsWith("Project(", StringComparison.Ordinal);
 
-        private static bool IsProjectLine(string projectLine, List<string> projectGuids) => IsProjectLine(projectLine, projectGuids, out _);
+        private static bool IsProjectLine(string projectLine, [CanBeNull] IReadOnlyCollection<string> projectGuids) => IsProjectLine(projectLine, projectGuids, out _);
 
-        private static bool IsProjectLine(string projectLine, List<string> projectGuids, out string projectGuid)
+        private static bool IsProjectLine(string projectLine, [CanBeNull] IReadOnlyCollection<string> projectGuids, out string projectGuid)
         {
             projectGuid = null;
 
-            if (!IsProjectLine(projectLine))
+            if (projectGuids == null || !IsProjectLine(projectLine))
             {
                 return false;
             }
@@ -103,8 +85,13 @@
             return false;
         }
 
-        private static string ReplaceProjectGuid(Dictionary<string, string> changedProjectGuids, string line)
+        private static string ReplaceProjectGuid([CanBeNull] Dictionary<string, string> changedProjectGuids, string line)
         {
+            if (changedProjectGuids == null)
+            {
+                return line;
+            }
+
             foreach (var tuple in changedProjectGuids)
             {
                 line = line.Replace(tuple.Key, tuple.Value);
@@ -126,17 +113,17 @@
             }
         }
 
-        private static IEnumerable<string> Update(
+        public static IEnumerable<string> Update(
             this Solution solution,
             string[] solutionFileLines,
-            List<ProjectInSolution> removedProjects,
-            List<ProjectInSolution> updatedProjects,
-            List<Project> newProjects,
-            Dictionary<string, string> changedProjectGuids,
+            [CanBeNull] List<ProjectInSolution> removedProjects,
+            [CanBeNull] List<ProjectInSolution> updatedProjects,
+            [CanBeNull] List<Project> newProjects,
+            [CanBeNull] Dictionary<string, string> changedProjectGuids,
             Codebase codebase)
         {
-            var removedProjectGuids = removedProjects.Select(p => p.ProjectGuid).ToList();
-            var updatedProjectGuids = updatedProjects.Select(p => p.ProjectGuid).ToList();
+            var removedProjectGuids = removedProjects?.Select(p => p.ProjectGuid).ToList();
+            var updatedProjectGuids = updatedProjects?.Select(p => p.ProjectGuid).ToList();
 
             var enumerator = solutionFileLines.GetEnumerator();
 
@@ -154,7 +141,7 @@
                     continue;
                 }
 
-                if (IsProjectLine(line, updatedProjectGuids, out var projectGuid))
+                if (updatedProjects != null && IsProjectLine(line, updatedProjectGuids, out var projectGuid))
                 {
                     var projectInSolution = updatedProjects.First(p => p.ProjectGuid == projectGuid);
                     var project = codebase.ProjectsByGuid[Guid.Parse(projectGuid)];
@@ -195,8 +182,8 @@
 
         private static IEnumerable<string> UpdateGlobalSection(
             IEnumerator enumerator,
-            List<string> removedProjectGuids,
-            Dictionary<string, string> changedProjectGuids)
+            [CanBeNull] IReadOnlyCollection<string> removedProjectGuids,
+            [CanBeNull] Dictionary<string, string> changedProjectGuids)
         {
             while (enumerator.MoveNext())
             {
