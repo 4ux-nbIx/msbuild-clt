@@ -1441,4 +1441,5 @@ private readonly DependencyPropertyValue&lt;$Type$&gt; _$propertyName$;</s:Strin
 	<s:String x:Key="/Default/PatternsAndTemplates/LiveTemplates/Template/=9E4F5DF732816D47BDB002C5975D1140/Scope/=E6E678D4B937A84D8C4585DDD2F27DB0/Type/@EntryValue">InCSharpExpression</s:String>
 	<s:String x:Key="/Default/PatternsAndTemplates/LiveTemplates/Template/=9E4F5DF732816D47BDB002C5975D1140/Shortcut/@EntryValue">dependencyPropertyValue</s:String>
 	<s:Boolean x:Key="/Default/PatternsAndTemplates/LiveTemplates/Template/=9E4F5DF732816D47BDB002C5975D1140/ShortenQualifiedReferences/@EntryValue">True</s:Boolean>
-	<s:String x:Key="/Default/PatternsAndTemplates/LiveTemplates/Template/=9E4F5DF732816D47BDB002C5975D1140/Text/@EntryValue">_$fieldName$ = GetDependencyPropertyValue($name$Property);</s:String></wpf:ResourceDictionary>
+	<s:String x:Key="/Default/PatternsAndTemplates/LiveTemplates/Template/=9E4F5DF732816D47BDB002C5975D1140/Text/@EntryValue">_$fieldName$ = GetDependencyPropertyValue($name$Property);</s:String>
+	<s:Boolean x:Key="/Default/UserDictionary/Words/=Guids/@EntryIndexedValue">True</s:Boolean></wpf:ResourceDictionary>

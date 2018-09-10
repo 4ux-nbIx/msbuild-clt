@@ -137,7 +137,7 @@
             command.Description = "Fixes project references.";
             command.HelpOption(_helpOptionTemplate);
 
-            var pathArgument = command.Argument("path", "Worspace of solution path");
+            var pathArgument = command.Argument("path", "Workspace of solution path");
 
             command.OnExecute(
                 () =>
@@ -154,7 +154,7 @@
             command.Description = "Merges solution files.";
             command.HelpOption(_helpOptionTemplate);
 
-            var pathArgument = command.Argument("path", "Worspace folder path");
+            var pathArgument = command.Argument("path",              "Workspace folder path");
             var targetArgument = command.Argument("target-solution", "Target solution file name.");
             var excludeOption = command.Option<string>("--exclude <EXCLUDE>", "Solution files to exclude", CommandOptionType.MultipleValue);
 
@@ -172,7 +172,7 @@
         {
             _logger = new ConsoleLogger();
 
-            var application = new CommandLineApplication { Name = "MsBuildUtils" };
+            var application = new CommandLineApplication { Name = "msbuild-clt" };
             _helpOptionTemplate = "-?|-h|--help";
             application.HelpOption(_helpOptionTemplate);
 
@@ -189,7 +189,7 @@
                 "find",
                 command =>
                 {
-                    command.Description = "TODO";
+                    command.Description = "Search for projects, solutions, files and etc.";
                     command.HelpOption(_helpOptionTemplate);
 
                     command.Command("unreferenced-projects", ConfigureFindUnreferencedProjectsCommand);
@@ -199,7 +199,7 @@
                 "fix",
                 command =>
                 {
-                    command.Description = "TODO";
+                    command.Description = "Fix broken file/project references and etc.";
                     command.HelpOption(_helpOptionTemplate);
 
                     command.Command("assembly-bindings",  ConfigureFixAssemblyBindingsCommand);
@@ -210,7 +210,7 @@
                 "merge",
                 command =>
                 {
-                    command.Description = "TODO";
+                    command.Description = "Merge solutions";
                     command.HelpOption(_helpOptionTemplate);
 
                     command.Command("solutions", ConfigureMergeSolutionsCommand);
