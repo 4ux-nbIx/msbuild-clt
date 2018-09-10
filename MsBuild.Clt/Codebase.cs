@@ -34,6 +34,16 @@
             }
 
             _projectCollection = new ProjectCollection(ToolsetDefinitionLocations.Registry);
+
+            var latestToolset = _projectCollection.Toolsets.Select(t => (Version: new Version(t.ToolsVersion), Toolset: t))
+                .OrderByDescending(t => t.Version)
+                .FirstOrDefault()
+                .Toolset;
+
+            if (latestToolset != null)
+            {
+                _projectCollection.DefaultToolsVersion = latestToolset.ToolsVersion;
+            }
         }
 
         private Solution LoadSolution(string f)
