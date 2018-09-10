@@ -29,8 +29,8 @@
 
         private List<Solution> _solutions = new List<Solution>();
 
-        internal Project(Codebase codebase, MsBuildProject project, ILogger logger)
-            : this(codebase, project.FullPath.GetFileSystemPath(), project.GetProjectGuid(), logger) =>
+        internal Project(Codebase codebase, MsBuildProject project, Guid guid, ILogger logger)
+            : this(codebase, project.FullPath.GetFileSystemPath(), project.GetProjectGuid() ?? guid, logger) =>
             _project = project;
 
         internal Project(Codebase codebase, string absolutePath, Guid guid, ILogger logger)
@@ -179,7 +179,17 @@
             return _project;
         }
 
-        private (string fullPath, Guid guid, ProjectItem item) GetProjectReferencePathAndGuid(ProjectItem r) =>
-            (Path.GetFullPath(Path.Combine(DirectoryPath, r.EvaluatedInclude)), Guid.Parse(r.GetMetadataValue("Project")), r);
+        private (string fullPath, Guid guid, ProjectItem item) GetProjectReferencePathAndGuid(ProjectItem r)
+        {
+            var guid = Guid.Empty;
+            var metadataGuidValue = r.GetMetadataValue("Project");
+
+            if (!string.IsNullOrWhiteSpace(metadataGuidValue))
+            {
+                guid = Guid.Parse(metadataGuidValue);
+            }
+
+            return (Path.GetFullPath(Path.Combine(DirectoryPath, r.EvaluatedInclude)), guid, r);
+        }
     }
 }

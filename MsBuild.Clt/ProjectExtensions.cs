@@ -16,12 +16,16 @@
     {
         private const string _projectReferenceItemType = "ProjectReference";
 
-        public static Guid GetProjectGuid([NotNull] this Microsoft.Build.Evaluation.Project project)
+        public static Guid? GetProjectGuid([NotNull] this Microsoft.Build.Evaluation.Project project)
         {
             var property = project.GetProperty("ProjectGuid");
 
-            var guid = Guid.Parse(property.EvaluatedValue);
-            return guid;
+            if (property == null)
+            {
+                return null;
+            }
+
+            return Guid.Parse(property.EvaluatedValue);
         }
 
         public static ICollection<ProjectItem> GetProjectReferences([NotNull] this Microsoft.Build.Evaluation.Project project) =>

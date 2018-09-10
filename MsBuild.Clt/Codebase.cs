@@ -152,7 +152,7 @@
                     | ProjectLoadSettings.IgnoreInvalidImports
                     | ProjectLoadSettings.IgnoreMissingImports);
 
-                project = new Project(this, msbuildProject, _logger);
+                project = new Project(this, msbuildProject, guid, _logger);
             }
             catch (Exception exception)
             {
