@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{75ECE198-6E56-40D9-B56B-FADDECE2D69D}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>MsBuild.Utils</RootNamespace>
-    <AssemblyName>MsBuild.Utils</AssemblyName>
+    <RootNamespace>MsBuild.Clt</RootNamespace>
+    <AssemblyName>MsBuild.Clt</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>

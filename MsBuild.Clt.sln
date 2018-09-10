@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27428.2005
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MsBuild.Utils", "SolutionUtils\MsBuild.Utils.csproj", "{75ECE198-6E56-40D9-B56B-FADDECE2D69D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MsBuild.Clt", "MsBuild.Clt\MsBuild.Clt.csproj", "{75ECE198-6E56-40D9-B56B-FADDECE2D69D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

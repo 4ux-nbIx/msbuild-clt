@@ -1,4 +1,4 @@
-﻿namespace MsBuild.Utils
+﻿namespace MsBuild.Clt
 {
     #region Namespace Imports
 
