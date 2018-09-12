@@ -191,5 +191,8 @@
 
             return (Path.GetFullPath(Path.Combine(DirectoryPath, r.EvaluatedInclude)), guid, r);
         }
+
+        public bool ContainsFile(string filePath) =>
+            GetProject().Items.Any(i => string.Equals(i.GetFullPath(), filePath, StringComparison.OrdinalIgnoreCase));
     }
 }

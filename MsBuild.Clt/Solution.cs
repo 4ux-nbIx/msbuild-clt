@@ -34,6 +34,16 @@
         public string FileName => Path.GetFileName(FullPath);
         public string FullPath { get; }
 
+        public bool ContainsFile(string filePath)
+        {
+            if (_file.ProjectsInOrder.Any(p => p.AbsolutePath == filePath))
+            {
+                return true;
+            }
+
+            return GetAllProjects().Any(p => p.ContainsFile(filePath));
+        }
+
         public void FixProjectReferences()
         {
             var projectsByGuid = _file.GetMsBuildProjects().ToDictionary(p => Guid.Parse(p.ProjectGuid), p => p);

@@ -48,6 +48,18 @@
 
         public static string ToFileSystemPath(this Uri uri) => uri.ToString().Replace('/', Path.DirectorySeparatorChar);
 
+        public static string ToFullPath(this string path, string currentDirectory)
+        {
+            var fullPath = Path.GetFullPath(path);
+
+            if (string.Equals(fullPath, path, StringComparison.OrdinalIgnoreCase))
+            {
+                return path;
+            }
+
+            return Path.Combine(currentDirectory, path);
+        }
+
         public static string ToRelativePath(this string path, string toPath)
         {
             var projectUri = new Uri(path);

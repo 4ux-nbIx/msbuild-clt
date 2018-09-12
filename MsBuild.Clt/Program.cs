@@ -12,22 +12,49 @@
     #endregion
 
 
-    internal class Program
+    internal static class Program
     {
-        private static string _helpOptionTemplate;
+        private static string _helpOptionTemplate = "-?|-h|--help";
         private static ILogger _logger;
 
-        private static void ConfigureFindUnreferencedProjectsCommand(CommandLineApplication command)
+        private static void ConfigureFindContainingSolutionsCommand(CommandLineApplication command)
         {
-            command.Description = "Finds unreferenced projects in the specified folder.";
-            command.HelpOption(_helpOptionTemplate);
+            command.Setup("Finds solutions containing the specified files.");
 
-            var sourceCodeFolderArgument = command.Argument("folder", "Source code folder");
+            var workspacePath = command.CreateWorkspacePathArgument();
+            var filesOption = command.Option<string>("--containing-files", "file list", CommandOptionType.SingleOrNoValue);
+            var excludedSolutions = command.CreateExcludeOption();
 
             command.OnExecute(
                 () =>
                 {
-                    foreach (var project in Codebase.CreateFromFolder(sourceCodeFolderArgument.Value, _logger).FindUnreferencedProjects())
+                    var files = filesOption.ParseList().Select(f => f.ToFullPath(workspacePath.Value)).ToList();
+
+                    var codebase = Codebase.CreateFromFolder(workspacePath.Value, _logger);
+
+                    var solutions = codebase.GetSolutions(excludedSolutions.ParsedValues)
+                        .Where(s => files.Any(f => s.ContainsFile(f)))
+                        .ToList();
+
+                    foreach (var solution in solutions)
+                    {
+                        _logger.WriteInfo(solution.FullPath);
+                    }
+
+                    return 0;
+                });
+        }
+
+        private static void ConfigureFindUnreferencedProjectsCommand(CommandLineApplication command)
+        {
+            command.Setup("Finds unreferenced projects in the specified folder.");
+
+            var workspacePath = command.CreateWorkspacePathArgument();
+
+            command.OnExecute(
+                () =>
+                {
+                    foreach (var project in Codebase.CreateFromFolder(workspacePath.Value, _logger).FindUnreferencedProjects())
                     {
                         _logger.WriteInfo(project);
                     }
@@ -38,10 +65,9 @@
 
         private static void ConfigureFixAssemblyBindingsCommand(CommandLineApplication command)
         {
-            command.Description = "Fixes assembly bindings.";
-            command.HelpOption(_helpOptionTemplate);
+            command.Setup("Fixes assembly bindings.");
 
-            var solutionArgument = command.Argument("solution", "Solution file");
+            var solutionPath = command.CreateSolutionArgument();
 
             command.OnExecute(
                 () =>
@@ -49,7 +75,7 @@
                     var assemblyLoader = new AssemblyLoader(_logger);
                     var bindingsUtil = new AssemblyBindingsUtil(_logger);
 
-                    var projects = Codebase.CreateFromSolution(solutionArgument.Value, _logger).GetAllProjects().ToList();
+                    var projects = Codebase.CreateFromSolution(solutionPath.Value, _logger).GetAllProjects().ToList();
 
                     for (var index = 0; index < projects.Count; index++)
                     {
@@ -134,47 +160,50 @@
 
         private static void ConfigureFixProjectReferencesCommand(CommandLineApplication command)
         {
-            command.Description = "Fixes project references.";
-            command.HelpOption(_helpOptionTemplate);
+            command.Setup("Fixes project references.");
 
-            var pathArgument = command.Argument("path", "Workspace of solution path");
+            var workspacePath = command.CreateWorkspacePathArgument();
 
             command.OnExecute(
                 () =>
                 {
-                    var path = pathArgument.Value;
-
-                    var codebase = Codebase.CreateFromFolder(path, _logger);
+                    var codebase = Codebase.CreateFromFolder(workspacePath.Value, _logger);
                     codebase.FixProjectReferences();
                 });
         }
 
         private static void ConfigureMergeSolutionsCommand(CommandLineApplication command)
         {
-            command.Description = "Merges solution files.";
-            command.HelpOption(_helpOptionTemplate);
+            command.Setup("Merges solution files.");
 
-            var pathArgument = command.Argument("path",              "Workspace folder path");
-            var targetArgument = command.Argument("target-solution", "Target solution file name.");
-            var excludeOption = command.Option<string>("--exclude <EXCLUDE>", "Solution files to exclude", CommandOptionType.MultipleValue);
+            var workspacePath = command.CreateWorkspacePathArgument();
+            var targetSolution = command.CreateSolutionArgument();
+            var excludedSolutions = command.CreateExcludeOption();
 
             command.OnExecute(
                 () =>
                 {
-                    var path = pathArgument.Value;
-
-                    var codebase = Codebase.CreateFromFolder(path, _logger);
-                    codebase.MergeSolutions(targetArgument.Value, excludeOption.ParsedValues);
+                    var codebase = Codebase.CreateFromFolder(workspacePath.Value, _logger);
+                    codebase.MergeSolutions(targetSolution.Value, excludedSolutions.ParsedValues);
                 });
         }
+
+        private static CommandOption<string> CreateExcludeOption(this CommandLineApplication command) =>
+            command.Option<string>("--excluding <EXCLUDE>", "Solution files to exclude", CommandOptionType.MultipleValue);
+
+        private static CommandArgument CreateSolutionArgument(this CommandLineApplication command) =>
+            command.Argument("solution", "Solution file path.");
+
+        private static CommandArgument CreateWorkspacePathArgument(this CommandLineApplication command) =>
+            command.Argument("workspace", "Workspace folder path");
+
 
         private static void Main(string[] args)
         {
             _logger = new ConsoleLogger();
 
             var application = new CommandLineApplication { Name = "msbuild-clt" };
-            _helpOptionTemplate = "-?|-h|--help";
-            application.HelpOption(_helpOptionTemplate);
+            application.Setup("MSBuild command line toolkit");
 
             application.OnExecute(
                 () =>
@@ -189,18 +218,17 @@
                 "find",
                 command =>
                 {
-                    command.Description = "Search for projects, solutions, files and etc.";
-                    command.HelpOption(_helpOptionTemplate);
+                    command.Setup("Search for projects, solutions, files and etc.");
 
                     command.Command("unreferenced-projects", ConfigureFindUnreferencedProjectsCommand);
+                    command.Command("solutions",             ConfigureFindContainingSolutionsCommand);
                 });
 
             application.Command(
                 "fix",
                 command =>
                 {
-                    command.Description = "Fix broken file/project references and etc.";
-                    command.HelpOption(_helpOptionTemplate);
+                    command.Setup("Fix broken file/project references and etc.");
 
                     command.Command("assembly-bindings",  ConfigureFixAssemblyBindingsCommand);
                     command.Command("project-references", ConfigureFixProjectReferencesCommand);
@@ -210,13 +238,25 @@
                 "merge",
                 command =>
                 {
-                    command.Description = "Merge solutions";
-                    command.HelpOption(_helpOptionTemplate);
+                    command.Setup("Merge solutions");
 
                     command.Command("solutions", ConfigureMergeSolutionsCommand);
                 });
 
             application.Execute(args);
+        }
+
+        private static IEnumerable<string> ParseList(this CommandOption<string> filesOption) =>
+            filesOption.ParsedValue.Trim()
+                .Trim('"')
+                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(f => f.Trim())
+                .Distinct();
+
+        private static void Setup(this CommandLineApplication command, string description)
+        {
+            command.Description = description;
+            command.HelpOption(_helpOptionTemplate);
         }
     }
 }

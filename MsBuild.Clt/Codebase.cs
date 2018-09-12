@@ -46,15 +46,6 @@
             }
         }
 
-        private Solution LoadSolution(string f)
-        {
-            var solution = new Solution(f, this, _logger);
-
-            _solutions.Add(solution);
-
-            return solution;
-        }
-
         public Dictionary<string, Project> ProjectsByFileName { get; } = new Dictionary<string, Project>();
         public Dictionary<Guid, Project> ProjectsByGuid { get; } = new Dictionary<Guid, Project>();
         public Dictionary<Guid, Project> ProjectsWithDuplicateGuid { get; } = new Dictionary<Guid, Project>();
@@ -120,6 +111,42 @@
             return Solutions.SelectMany(s => s.GetAllProjects()).Distinct();
         }
 
+        public List<Solution> GetSolutions(IReadOnlyList<string> excludedSolutions)
+        {
+            var excludeGlob = new CompositeGlob(excludedSolutions.Select(s => MSBuildGlob.Parse(_folder, s)));
+            return Solutions.Where(s => !excludeGlob.IsMatch(s.FullPath)).ToList();
+        }
+
+        public void MergeSolutions(string destinationSolutionPath, IReadOnlyList<string> excludedSolutions)
+        {
+            var solutionsToMerge = GetSolutions(excludedSolutions);
+
+            if (solutionsToMerge.Count == 0)
+            {
+                _logger.WriteInfo("No solutions found.");
+            }
+
+            var fullSolutionPath = Path.Combine(_folder, destinationSolutionPath);
+
+            var targetSolution =
+                Solutions.FirstOrDefault(s => s.FullPath.Equals(fullSolutionPath, StringComparison.InvariantCultureIgnoreCase));
+
+            if (targetSolution == null)
+            {
+                var solution = solutionsToMerge[0];
+                solutionsToMerge.RemoveAt(0);
+
+                File.Copy(solution.FullPath, fullSolutionPath, false);
+
+                targetSolution = LoadSolution(fullSolutionPath);
+            }
+
+            foreach (var solution in solutionsToMerge.Where(s => s != targetSolution))
+            {
+                targetSolution.Merge(solution);
+            }
+        }
+
         [CanBeNull]
         internal Project LoadProject(ProjectInSolution projectInSolution) =>
             LoadProject(projectInSolution.AbsolutePath, Guid.Parse(projectInSolution.ProjectGuid));
@@ -174,35 +201,13 @@
             return project;
         }
 
-        public void MergeSolutions(string destinationSolutionPath, IReadOnlyList<string> excludedSolutions)
+        private Solution LoadSolution(string f)
         {
-            var excludeGlob = new CompositeGlob(excludedSolutions.Select(s => MSBuildGlob.Parse(_folder, s)));
-            var solutionsToMerge = Solutions.Where(s => !excludeGlob.IsMatch(s.FullPath)).ToList();
+            var solution = new Solution(f, this, _logger);
 
-            if (solutionsToMerge.Count == 0)
-            {
-                _logger.WriteInfo("No solutions found.");
-            }
+            _solutions.Add(solution);
 
-            var fullSolutionPath = Path.Combine(_folder, destinationSolutionPath);
-
-            var targetSolution =
-                Solutions.FirstOrDefault(s => s.FullPath.Equals(fullSolutionPath, StringComparison.InvariantCultureIgnoreCase));
-
-            if (targetSolution == null)
-            {
-                var solution = solutionsToMerge[0];
-                solutionsToMerge.RemoveAt(0);
-
-                File.Copy(solution.FullPath, fullSolutionPath, false);
-
-                targetSolution = LoadSolution(fullSolutionPath);
-            }
-
-            foreach (var solution in solutionsToMerge.Where(s => s != targetSolution))
-            {
-                targetSolution.Merge(solution);
-            }
+            return solution;
         }
     }
 }
