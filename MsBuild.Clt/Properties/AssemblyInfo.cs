@@ -5,12 +5,12 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("MsBuild.Clt")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyTitle("MsBuild-Clt")]
+[assembly: AssemblyDescription("MSBuild command line toolkit")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("MsBuild.Clt")]
-[assembly: AssemblyCopyright("Copyright ©  2018")]
+[assembly: AssemblyCompany("Roman Novitskiy")]
+[assembly: AssemblyProduct("MsBuild-Clt")]
+[assembly: AssemblyCopyright("Copyright © Roman Novitskiy 2018")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
