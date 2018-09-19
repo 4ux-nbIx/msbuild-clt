@@ -232,7 +232,7 @@
                     command.Setup("Fix broken file/project references and etc.");
 
                     command.Command("assembly-bindings",  ConfigureFixAssemblyBindingsCommand);
-                    command.Command("project-references", ConfigureFixProjectReferencesCommand);
+                    command.Command("project", COnfigureFixProjectCommand);
                 });
 
             application.Command(
@@ -245,6 +245,13 @@
                 });
 
             application.Execute(args);
+        }
+
+        private static void COnfigureFixProjectCommand(CommandLineApplication command)
+        {
+            command.Setup("Project fixes");
+
+            command.Command("references", ConfigureFixProjectReferencesCommand);
         }
 
         private static IReadOnlyList<string> ParseList(this CommandOption<string> filesOption) =>
