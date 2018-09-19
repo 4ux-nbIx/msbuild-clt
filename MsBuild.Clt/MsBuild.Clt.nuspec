@@ -10,7 +10,7 @@
     <projectUrl>https://github.com/4ux-nbIx/msbuild-clt</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>$description$</description>
-    <releaseNotes>Renamed fir project-references command to fix project references.</releaseNotes>
+    <releaseNotes>Find solutions command fixes.</releaseNotes>
     <copyright>Copyright Roman Novitsky 2018</copyright>
     <tags>MSBuild</tags>
   </metadata>

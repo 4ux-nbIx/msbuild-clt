@@ -12,6 +12,8 @@
 
     internal static class FileSystemUtils
     {
+        public static string FixPathSeparator(this string path) => path.Replace('/', Path.DirectorySeparatorChar);
+
         public static string GetFileSystemName(this string projectFullPath, out string directoryName)
         {
             directoryName = Path.GetDirectoryName(projectFullPath);
@@ -46,7 +48,7 @@
             }
         }
 
-        public static string ToFileSystemPath(this Uri uri) => uri.ToString().Replace('/', Path.DirectorySeparatorChar);
+        public static string ToFileSystemPath(this Uri uri) => uri.ToString().FixPathSeparator();
 
         public static string ToFullPath(this string path, string currentDirectory)
         {

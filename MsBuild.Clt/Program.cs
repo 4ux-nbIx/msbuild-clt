@@ -28,11 +28,11 @@
             command.OnExecute(
                 () =>
                 {
-                    var files = filesOption.ParseList().Select(f => f.ToFullPath(workspacePath.Value)).ToList();
+                    var files = filesOption.ParseList().Select(f => f.FixPathSeparator().ToFullPath(workspacePath.Value)).ToList();
 
                     var codebase = Codebase.CreateFromFolder(workspacePath.Value, _logger);
 
-                    var solutions = codebase.GetSolutions(excludedSolutions.ParsedValues)
+                    var solutions = codebase.GetSolutions(excludedSolutions.ParseList())
                         .Where(s => files.Any(f => s.ContainsFile(f)))
                         .ToList();
 
