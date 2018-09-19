@@ -14,7 +14,7 @@
 
     internal static class Program
     {
-        private static string _helpOptionTemplate = "-?|-h|--help";
+        private const string _helpOptionTemplate = "-?|-h|--help";
         private static ILogger _logger;
 
         private static void ConfigureFindContainingSolutionsCommand(CommandLineApplication command)
@@ -22,7 +22,7 @@
             command.Setup("Finds solutions containing the specified files.");
 
             var workspacePath = command.CreateWorkspacePathArgument();
-            var filesOption = command.Option<string>("--containing-files", "file list", CommandOptionType.SingleOrNoValue);
+            var filesOption = command.Option<string>("--containing-files", "file list", CommandOptionType.SingleValue);
             var excludedSolutions = command.CreateExcludeOption();
 
             command.OnExecute(
@@ -163,12 +163,13 @@
             command.Setup("Fixes project references.");
 
             var workspacePath = command.CreateWorkspacePathArgument();
+            var excludedSolutions = command.CreateExcludeOption();
 
             command.OnExecute(
                 () =>
                 {
                     var codebase = Codebase.CreateFromFolder(workspacePath.Value, _logger);
-                    codebase.FixProjectReferences();
+                    codebase.FixProjectReferences(excludedSolutions.ParseList());
                 });
         }
 
@@ -246,12 +247,11 @@
             application.Execute(args);
         }
 
-        private static IEnumerable<string> ParseList(this CommandOption<string> filesOption) =>
-            filesOption.ParsedValue.Trim()
-                .Trim('"')
-                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(f => f.Trim())
-                .Distinct();
+        private static IReadOnlyList<string> ParseList(this CommandOption<string> filesOption) =>
+            filesOption.ParsedValues.Where(v => !string.IsNullOrWhiteSpace(v)).SelectMany(v => v.ParseList()).ToList();
+
+        private static IEnumerable<string> ParseList(this string value) =>
+            value.Trim().Trim('"').Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).Select(f => f.Trim()).Distinct();
 
         private static void Setup(this CommandLineApplication command, string description)
         {

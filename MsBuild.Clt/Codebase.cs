@@ -84,7 +84,7 @@
                 .OrderBy(f => f);
         }
 
-        public void FixProjectReferences()
+        public void FixProjectReferences(IReadOnlyList<string> excludedSolutions)
         {
             var unreferencedProjects = FindUnreferencedProjects().ToList();
 
@@ -100,7 +100,9 @@
                 }
             }
 
-            foreach (var solution in Solutions)
+            var solutions = GetSolutions(excludedSolutions);
+
+            foreach (var solution in solutions)
             {
                 solution.FixProjectReferences();
             }
@@ -113,6 +115,11 @@
 
         public List<Solution> GetSolutions(IReadOnlyList<string> excludedSolutions)
         {
+            if (excludedSolutions == null || excludedSolutions.Count == 0)
+            {
+                return Solutions.ToList();
+            }
+
             var excludeGlob = new CompositeGlob(excludedSolutions.Select(s => MSBuildGlob.Parse(_folder, s)));
             return Solutions.Where(s => !excludeGlob.IsMatch(s.FullPath)).ToList();
         }
