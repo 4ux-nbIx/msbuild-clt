@@ -147,8 +147,8 @@
                     var project = codebase.ProjectsByGuid[Guid.Parse(projectGuid)];
                     var projectRelativeUri = project.GetRelativePath(solution);
 
-                    line = line.Replace(projectInSolution.RelativePath, projectRelativeUri)
-                        .Replace(projectInSolution.ProjectName, project.Name);
+                    line = line.Replace($"\"{projectInSolution.RelativePath}\"", $"\"{projectRelativeUri}\"")
+                        .Replace($"\"{projectInSolution.ProjectName}\"", $"\"{project.Name}\"");
                 }
 
                 if (newProjects != null && IsGlobalSectionLine(line))
